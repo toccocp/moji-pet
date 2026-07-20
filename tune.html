@@ -33,7 +33,7 @@ h1{font-size:16px;margin:0 0 4px;}
   border:none;background:none;font-family:inherit;font-size:11px;color:var(--ink-soft);
   text-decoration:underline;padding:4px 6px;
 }
-.frames{display:flex;gap:16px;align-items:center;}
+.frames{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
 .frame-real{
   width:116px;height:116px;border-radius:50%;background:var(--pink-pale);
   display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;overflow:hidden;flex:none;
@@ -44,7 +44,7 @@ h1{font-size:16px;margin:0 0 4px;}
 }
 .frame-big img,.frame-real img{display:block;}
 .frame-label{font-size:10px;color:var(--ink-soft);text-align:center;margin-top:4px;}
-.sliders{flex:1;min-width:160px;display:flex;flex-direction:column;gap:10px;}
+.sliders{flex:1;min-width:220px;width:100%;display:flex;flex-direction:column;gap:10px;}
 .slider-row{display:flex;align-items:center;gap:8px;}
 .slider-row label{font-size:12px;font-weight:700;color:var(--ink-soft);width:52px;flex:none;}
 .slider-row input[type=range]{flex:1;}
