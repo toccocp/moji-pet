@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>もじペット 調整ツール</title>
+<style>
+:root{
+  --pink:#FF9EC4; --pink-pale:#FFF0F6; --ink:#6B5560; --ink-soft:#9C8791; --card:#FFFFFF;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  margin:0;font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN W4",-apple-system,sans-serif;
+  background:linear-gradient(170deg,#FFF3F8 0%,#F3F6FF 55%,#F0FBF5 100%);
+  color:var(--ink);padding:16px 14px 60px;
+}
+h1{font-size:16px;margin:0 0 4px;}
+.hint{font-size:12px;color:var(--ink-soft);margin:0 0 16px;line-height:1.6;}
+.stagebar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.stagebar button{
+  border:none;border-radius:12px;padding:8px 14px;font-family:inherit;font-size:13px;font-weight:700;
+  background:rgba(255,255,255,.7);color:var(--ink-soft);
+}
+.stagebar button.active{background:var(--pink);color:#fff;}
+.pets{display:flex;flex-direction:column;gap:14px;}
+.pet-card{
+  background:var(--card);border-radius:18px;padding:14px;
+  box-shadow:0 4px 14px rgba(107,85,96,.08);
+}
+.pet-card-head{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
+.pet-name{font-weight:800;font-size:15px;flex:1;}
+.reset-btn{
+  border:none;background:none;font-family:inherit;font-size:11px;color:var(--ink-soft);
+  text-decoration:underline;padding:4px 6px;
+}
+.frames{display:flex;gap:16px;align-items:center;}
+.frame-real{
+  width:116px;height:116px;border-radius:50%;background:var(--pink-pale);
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;overflow:hidden;flex:none;
+}
+.frame-big{
+  width:180px;height:180px;border-radius:50%;background:var(--pink-pale);
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;overflow:hidden;flex:none;
+}
+.frame-big img,.frame-real img{display:block;}
+.frame-label{font-size:10px;color:var(--ink-soft);text-align:center;margin-top:4px;}
+.sliders{flex:1;min-width:160px;display:flex;flex-direction:column;gap:10px;}
+.slider-row{display:flex;align-items:center;gap:8px;}
+.slider-row label{font-size:12px;font-weight:700;color:var(--ink-soft);width:52px;flex:none;}
+.slider-row input[type=range]{flex:1;}
+.slider-row .val{font-size:12px;font-weight:700;width:44px;text-align:right;flex:none;}
+.exportbox{
+  margin-top:22px;background:var(--card);border-radius:18px;padding:14px;
+  box-shadow:0 4px 14px rgba(107,85,96,.08);
+}
+.exportbox h2{font-size:14px;margin:0 0 8px;}
+.exportbox textarea{
+  width:100%;height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px;
+  border:1px solid #eee;border-radius:10px;padding:10px;resize:vertical;background:#FAFAF9;color:#333;
+}
+.copybtn{
+  margin-top:10px;border:none;border-radius:999px;background:var(--pink);color:#fff;
+  font-family:inherit;font-size:14px;font-weight:800;padding:10px 24px;
+}
+.copybtn:active{transform:scale(.97);}
+.copied{font-size:12px;color:#0F6E56;margin-left:10px;font-weight:700;}
+</style>
+</head>
+<body>
+
+<h1>もじペット イラスト調整ツール</h1>
+<p class="hint">スライダーで大きさ・位置を動かすと、その場でプレビューに反映されます。<br>調整が終わったら一番下の枠の内容をコピーしてClaudeに送ってください。</p>
+
+<div class="stagebar" id="stagebar"></div>
+<div class="pets" id="pets"></div>
+
+<div class="exportbox">
+  <h2>書き出しコード</h2>
+  <textarea id="exportText" readonly></textarea>
+  <br>
+  <button class="copybtn" onclick="copyExport()">コピーする</button>
+  <span class="copied" id="copiedMsg" style="display:none;">コピーしました</span>
+</div>
+
+<script src="pet-data.js"></script>
+<script>
+const KEYS=['neko','tori','kuma','inu','iruka'];
+const NAMES={neko:'ねこ',tori:'シマエナガ',kuma:'くま',inu:'プードル',iruka:'イルカ'};
+const STAGE_NAMES=['たまご','あかちゃん','こども','おとな','キラキラ'];
+const PCT_S=[50,57,70,91,91];
+
+/* 現在アプリに入っている値(初期値として読み込む) */
+const SHIPPED_SCALE={tori:1.05,inu:1.03};
+const SHIPPED_NUDGE={kuma:{3:{y:12}}};
+
+const STORE_KEY='mojiPetTuneDraft';
+let state=loadState();
+let curStage=3;
+
+function defaultEntry(){ return {scale:100,x:0,y:0}; }
+function loadState(){
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');}catch(e){}
+  const s={};
+  for(const k of KEYS){
+    s[k]={};
+    for(let st=0;st<5;st++){
+      const base=defaultEntry();
+      if(SHIPPED_SCALE[k]) base.scale=Math.round(SHIPPED_SCALE[k]*100);
+      const nu=SHIPPED_NUDGE[k]&&SHIPPED_NUDGE[k][st];
+      if(nu){ base.x=nu.x||0; base.y=nu.y||0; }
+      s[k][st]=(saved[k]&&saved[k][st])?Object.assign(base,saved[k][st]):base;
+    }
+  }
+  return s;
+}
+function saveState(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+function petStyle(k,st){
+  const e=state[k][st];
+  const pct=(PCT_S[st]*e.scale/100).toFixed(1);
+  return `max-width:${pct}%;max-height:${pct}%;transform:translate(${e.x}%,${e.y}%);`;
+}
+
+function renderStageBar(){
+  const bar=document.getElementById('stagebar');
+  bar.innerHTML='';
+  STAGE_NAMES.forEach((name,st)=>{
+    const b=document.createElement('button');
+    b.textContent=name;
+    b.className=st===curStage?'active':'';
+    b.onclick=()=>{curStage=st;renderAll();};
+    bar.appendChild(b);
+  });
+}
+
+function renderPets(){
+  const wrap=document.getElementById('pets');
+  wrap.innerHTML='';
+  KEYS.forEach(k=>{
+    const card=document.createElement('div');
+    card.className='pet-card';
+    card.innerHTML=`
+      <div class="pet-card-head">
+        <div class="pet-name">${NAMES[k]}</div>
+        <button class="reset-btn" data-reset="${k}">この段階をリセット</button>
+      </div>
+      <div class="frames">
+        <div>
+          <div class="frame-big" id="big-${k}"><img id="img-big-${k}" src="${PET_IMG[k][curStage]}"></div>
+          <div class="frame-label">拡大表示</div>
+        </div>
+        <div>
+          <div class="frame-real" id="real-${k}"><img id="img-real-${k}" src="${PET_IMG[k][curStage]}"></div>
+          <div class="frame-label">実寸</div>
+        </div>
+        <div class="sliders">
+          <div class="slider-row">
+            <label>拡大</label>
+            <input type="range" min="60" max="140" step="1" id="scale-${k}">
+            <span class="val" id="scaleval-${k}"></span>
+          </div>
+          <div class="slider-row">
+            <label>左右</label>
+            <input type="range" min="-30" max="30" step="1" id="x-${k}">
+            <span class="val" id="xval-${k}"></span>
+          </div>
+          <div class="slider-row">
+            <label>上下</label>
+            <input type="range" min="-30" max="30" step="1" id="y-${k}">
+            <span class="val" id="yval-${k}"></span>
+          </div>
+        </div>
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+
+  wrap.querySelectorAll('[data-reset]').forEach(btn=>{
+    btn.onclick=()=>{
+      const k=btn.dataset.reset;
+      state[k][curStage]=defaultEntry();
+      const base=defaultEntry();
+      if(SHIPPED_SCALE[k]) base.scale=Math.round(SHIPPED_SCALE[k]*100);
+      const nu=SHIPPED_NUDGE[k]&&SHIPPED_NUDGE[k][curStage];
+      if(nu){ base.x=nu.x||0; base.y=nu.y||0; }
+      state[k][curStage]=base;
+      saveState();
+      syncSliders(k);
+      updatePreview(k);
+      renderExport();
+    };
+  });
+
+  KEYS.forEach(k=>{
+    ['scale','x','y'].forEach(prop=>{
+      const el=document.getElementById(prop+'-'+k);
+      el.oninput=()=>{
+        state[k][curStage][prop]=parseInt(el.value,10);
+        saveState();
+        updatePreview(k);
+        syncVal(k,prop);
+        renderExport();
+      };
+    });
+  });
+}
+
+function syncSliders(k){
+  const e=state[k][curStage];
+  document.getElementById('scale-'+k).value=e.scale;
+  document.getElementById('x-'+k).value=e.x;
+  document.getElementById('y-'+k).value=e.y;
+  syncVal(k,'scale');syncVal(k,'x');syncVal(k,'y');
+}
+function syncVal(k,prop){
+  const e=state[k][curStage];
+  const suffix = prop==='scale' ? '%' : '%';
+  const label = prop==='scale' ? e.scale+'%' : e[prop]+'%';
+  document.getElementById(prop+'val-'+k).textContent=label;
+}
+
+function updatePreview(k){
+  const style=petStyle(k,curStage);
+  const imgBig=document.getElementById('img-big-'+k);
+  const imgReal=document.getElementById('img-real-'+k);
+  imgBig.src=PET_IMG[k][curStage]; imgBig.style=style;
+  imgReal.src=PET_IMG[k][curStage]; imgReal.style=style;
+}
+
+function renderExport(){
+  const scaleEntries=[]; const nudgeEntries=[];
+  KEYS.forEach(k=>{
+    for(let st=0;st<5;st++){
+      const e=state[k][st];
+      if(e.scale!==100){
+        // scaleは種全体に一つだけ持たせる仕様なので、最後に触った段階の値を代表値にする
+      }
+      if(e.x!==0||e.y!==0){
+        nudgeEntries.push(`  ${k}:{${st}:{`+(e.x?`x:${e.x},`:'')+(e.y?`y:${e.y}`:'')+`}}`);
+      }
+    }
+    // scaleは段階共通の1値。0以外に触られていれば代表として stage3(おとな)優先、なければ他の段階から拾う
+    const pick = state[k][3].scale!==100 ? state[k][3].scale
+      : ([0,1,2,4].map(st=>state[k][st].scale).find(v=>v!==100));
+    if(pick && pick!==100) scaleEntries.push(`  ${k}:${(pick/100).toFixed(2)}`);
+  });
+  const code =
+`const SCALE_S={\n${scaleEntries.join(',\n')}\n};\nconst NUDGE_S={\n${nudgeEntries.join(',\n')}\n};`;
+  document.getElementById('exportText').value = code;
+}
+
+function renderAll(){
+  renderStageBar();
+  renderPets();
+  KEYS.forEach(k=>{ syncSliders(k); updatePreview(k); });
+  renderExport();
+}
+function copyExport(){
+  const ta=document.getElementById('exportText');
+  ta.select();
+  document.execCommand('copy');
+  const msg=document.getElementById('copiedMsg');
+  msg.style.display='inline';
+  setTimeout(()=>msg.style.display='none',1800);
+}
+
+renderAll();
+</script>
+</body>
+</html>
