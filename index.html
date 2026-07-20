@@ -380,16 +380,26 @@ function sndGrow(){try{[523,659,784,880,1047,1319].forEach((f,i)=>tone(f,i*.11,.
    あかちゃん=枠上部1/3余白 / こども=上部1/4余白 / おとな=枠ギリギリ */
 const PCT_S=[50,57,70,91,91];
 const SIZE_B=[100,112,132,160,225];
-/* 種ごとの微調整
-   SCALE_S: 大きさの倍率(全段階)
-   NUDGE_S: 枠内のずらし(画像サイズに対する%)。段階ごとに指定
-     くまのおとな=右耳が円で切れるため下げる(後ろ足・尻尾は少し切れる) */
-const SCALE_S={tori:1.05,inu:1.03};
-const NUDGE_S={kuma:{3:{y:12}}};
+/* 種ごとの微調整(tune.htmlで目視調整した値)
+   SCALE_S: 大きさの倍率。数値=全段階共通、オブジェクト={段階:倍率}で段階ごと指定
+   NUDGE_S: 枠内のずらし(画像サイズに対する%)。種ごとに段階をまとめて指定 */
+const SCALE_S={neko:1.40,tori:1.03,kuma:0.96,inu:1.06,iruka:0.91};
+function scaleOf(sp,stage){
+  const v=SCALE_S[sp];
+  if(v==null)return 1;
+  return (typeof v==='object') ? (v[stage]||1) : v;
+}
+const NUDGE_S={
+  neko:{1:{y:-26},2:{x:5,y:3}},
+  tori:{1:{y:-26},2:{x:6},3:{x:3,y:-8}},
+  kuma:{1:{y:-26},3:{x:2,y:-1}},
+  inu:{1:{y:-26},3:{x:1,y:-4}},
+  iruka:{1:{y:-26},2:{x:5,y:-19},3:{x:-3,y:-11}}
+};
 function petVisual(sp,stage,big){
   const imgs=PET_IMG[sp];
   if(!(imgs&&imgs[stage]))return '🥚';
-  const k=SCALE_S[sp]||1;
+  const k=scaleOf(sp,stage);
   const n=(NUDGE_S[sp]&&NUDGE_S[sp][stage])||{};
   const tr=(n.x||n.y)?`transform:translate(${n.x||0}%,${n.y||0}%);`:'';
   const style=big

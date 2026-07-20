@@ -90,14 +90,34 @@ const STAGE_NAMES=['たまご','あかちゃん','こども','おとな','キラ
 const PCT_S=[50,57,70,91,91];
 
 /* 現在アプリに入っている値(初期値として読み込む) */
-const SHIPPED_SCALE={tori:1.05,inu:1.03};
-const SHIPPED_NUDGE={kuma:{3:{y:12}}};
+const SHIPPED_SCALE={neko:1.40,tori:1.03,kuma:0.96,inu:1.06,iruka:0.91};
+const SHIPPED_NUDGE={
+  neko:{1:{y:-26},2:{x:5,y:3}},
+  tori:{1:{y:-26},2:{x:6},3:{x:3,y:-8}},
+  kuma:{1:{y:-26},3:{x:2,y:-1}},
+  inu:{1:{y:-26},3:{x:1,y:-4}},
+  iruka:{1:{y:-26},2:{x:5,y:-19},3:{x:-3,y:-11}}
+};
 
 const STORE_KEY='mojiPetTuneDraft';
 let state=loadState();
 let curStage=3;
 
 function defaultEntry(){ return {scale:100,x:0,y:0}; }
+/* SHIPPED_SCALEは 数値(全段階共通) と {段階:倍率} の両方を受け付ける */
+function shippedScale(k,st){
+  const v=SHIPPED_SCALE[k];
+  if(v==null)return 100;
+  const n=(typeof v==='object') ? (v[st]||1) : v;
+  return Math.round(n*100);
+}
+function baseEntry(k,st){
+  const base=defaultEntry();
+  base.scale=shippedScale(k,st);
+  const nu=SHIPPED_NUDGE[k]&&SHIPPED_NUDGE[k][st];
+  if(nu){ base.x=nu.x||0; base.y=nu.y||0; }
+  return base;
+}
 function loadState(){
   let saved={};
   try{saved=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');}catch(e){}
@@ -105,10 +125,7 @@ function loadState(){
   for(const k of KEYS){
     s[k]={};
     for(let st=0;st<5;st++){
-      const base=defaultEntry();
-      if(SHIPPED_SCALE[k]) base.scale=Math.round(SHIPPED_SCALE[k]*100);
-      const nu=SHIPPED_NUDGE[k]&&SHIPPED_NUDGE[k][st];
-      if(nu){ base.x=nu.x||0; base.y=nu.y||0; }
+      const base=baseEntry(k,st);
       s[k][st]=(saved[k]&&saved[k][st])?Object.assign(base,saved[k][st]):base;
     }
   }
@@ -179,12 +196,7 @@ function renderPets(){
   wrap.querySelectorAll('[data-reset]').forEach(btn=>{
     btn.onclick=()=>{
       const k=btn.dataset.reset;
-      state[k][curStage]=defaultEntry();
-      const base=defaultEntry();
-      if(SHIPPED_SCALE[k]) base.scale=Math.round(SHIPPED_SCALE[k]*100);
-      const nu=SHIPPED_NUDGE[k]&&SHIPPED_NUDGE[k][curStage];
-      if(nu){ base.x=nu.x||0; base.y=nu.y||0; }
-      state[k][curStage]=base;
+      state[k][curStage]=baseEntry(k,curStage);
       saveState();
       syncSliders(k);
       updatePreview(k);
@@ -231,19 +243,29 @@ function updatePreview(k){
 function renderExport(){
   const scaleEntries=[]; const nudgeEntries=[];
   KEYS.forEach(k=>{
+    /* ずらしは種ごとに1エントリへまとめる(段階ごとに分けて書くと後勝ちで上書きされるため) */
+    const perStage=[];
     for(let st=0;st<5;st++){
       const e=state[k][st];
-      if(e.scale!==100){
-        // scaleは種全体に一つだけ持たせる仕様なので、最後に触った段階の値を代表値にする
-      }
       if(e.x!==0||e.y!==0){
-        nudgeEntries.push(`  ${k}:{${st}:{`+(e.x?`x:${e.x},`:'')+(e.y?`y:${e.y}`:'')+`}}`);
+        const parts=[];
+        if(e.x) parts.push(`x:${e.x}`);
+        if(e.y) parts.push(`y:${e.y}`);
+        perStage.push(`${st}:{${parts.join(',')}}`);
       }
     }
-    // scaleは段階共通の1値。0以外に触られていれば代表として stage3(おとな)優先、なければ他の段階から拾う
-    const pick = state[k][3].scale!==100 ? state[k][3].scale
-      : ([0,1,2,4].map(st=>state[k][st].scale).find(v=>v!==100));
-    if(pick && pick!==100) scaleEntries.push(`  ${k}:${(pick/100).toFixed(2)}`);
+    if(perStage.length) nudgeEntries.push(`  ${k}:{${perStage.join(',')}}`);
+
+    /* 拡大: 全段階が同じ値なら1つの数値、段階ごとに違えば{段階:倍率}で書き出す */
+    const scales=[0,1,2,3,4].map(st=>state[k][st].scale);
+    const allSame=scales.every(v=>v===scales[0]);
+    if(allSame){
+      if(scales[0]!==100) scaleEntries.push(`  ${k}:${(scales[0]/100).toFixed(2)}`);
+    }else{
+      const parts=[];
+      scales.forEach((v,st)=>{ if(v!==100) parts.push(`${st}:${(v/100).toFixed(2)}`); });
+      if(parts.length) scaleEntries.push(`  ${k}:{${parts.join(',')}}`);
+    }
   });
   const code =
 `const SCALE_S={\n${scaleEntries.join(',\n')}\n};\nconst NUDGE_S={\n${nudgeEntries.join(',\n')}\n};`;
