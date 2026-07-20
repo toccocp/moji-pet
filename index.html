@@ -380,12 +380,18 @@ function sndGrow(){try{[523,659,784,880,1047,1319].forEach((f,i)=>tone(f,i*.11,.
    あかちゃん=枠上部1/3余白 / こども=上部1/4余白 / おとな=枠ギリギリ */
 const PCT_S=[50,57,70,91,91];
 const SIZE_B=[100,112,132,160,225];
+/* 枠内での下方向の微調整(画像高さに対する%)。
+   イルカは斜め姿勢で頭が枠の上端に迫るため、下げて頭に余白を作る
+   (そのぶん尻尾は枠で少し切れる) */
+const NUDGE_S={iruka:[0,0,0,7,0]};
 function petVisual(sp,stage,big){
   const imgs=PET_IMG[sp];
   if(!(imgs&&imgs[stage]))return '🥚';
+  const nudge=(NUDGE_S[sp]&&NUDGE_S[sp][stage])||0;
   const style=big
     ? `max-width:${SIZE_B[stage]}px;max-height:${SIZE_B[stage]}px;`
-    : `max-width:${PCT_S[stage]}%;max-height:${PCT_S[stage]}%;`;
+    : `max-width:${PCT_S[stage]}%;max-height:${PCT_S[stage]}%;`
+      +(nudge?`transform:translateY(${nudge}%);`:'');
   return `<img src="${imgs[stage]}" style="${style}" alt="">`;
 }
 function renderPet(){
